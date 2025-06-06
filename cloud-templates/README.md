@@ -2,6 +2,17 @@
 
 A comprehensive script for creating cloud-init templates in Proxmox VE clusters with **optimized VGA console access**. This script automates the entire process of downloading cloud images, creating VMs, importing disks, configuring cloud-init, and converting to templates.
 
+## 🎯 Perfect for Automated VM Deployment
+
+This script creates templates optimized for rapid VM deployment:
+
+- **VGA console access** for easy troubleshooting via `qm terminal`
+- **Cloud-init ready** for automated VM bootstrap
+- **Guest agent configured** for Proxmox integration
+- **Works with manual deployment** or automation tools
+
+**💡 Tip:** Combine with the **[cloud-init configurations](../cloud-init/README.md)** in this repository for complete VM automation!
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -11,9 +22,9 @@ A comprehensive script for creating cloud-init templates in Proxmox VE clusters 
 - [Console Configuration](#console-configuration)
 - [Basic Usage](#basic-usage)
 - [Template Creation Examples](#template-creation-examples)
-- [VM Cloning and Configuration](#vm-cloning-and-configuration)
+- [VM Deployment Examples](#vm-deployment-examples)
 - [SSH Key Setup](#ssh-key-setup)
-- [Cloud-Init Configuration](#cloud-init-configuration)
+- [Cloud-Init Integration](#cloud-init-integration)
 - [Cluster Operations](#cluster-operations)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
@@ -27,6 +38,7 @@ This script creates cloud-init ready templates **optimized for Proxmox VE consol
 - Configured with SSH keys for secure access
 - Customized with cloud-init for automated provisioning
 - **Accessed via interactive VGA console for troubleshooting**
+- **Deployed with standard Proxmox commands**
 
 ### Key Features
 
@@ -59,27 +71,19 @@ The script automatically checks for these commands:
 
 ## Installation
 
-### 1. Download the Script
+### 1. Clone Repository
 
 ```bash
-# Download to Proxmox host
-wget https://raw.githubusercontent.com/your-repo/create-cloud-template.sh
-chmod +x create-cloud-template.sh
+# Clone repository on Proxmox host
+cd /opt
+git clone https://github.com/dougjaworski/proxmox-scripts.git
+cd proxmox-scripts
 
-# Or copy the script manually
-nano create-cloud-template.sh
-# Paste script content and save
-chmod +x create-cloud-template.sh
-```
+# Make script executable
+chmod +x cloud-templates/create-cloud-template.sh
 
-### 2. Verify Installation
-
-```bash
 # Test script
-./create-cloud-template.sh --help
-
-# Check prerequisites
-./create-cloud-template.sh --vmid 9999 --help
+./cloud-templates/create-cloud-template.sh --help
 ```
 
 ## Storage Strategy
@@ -105,9 +109,9 @@ chmod +x create-cloud-template.sh
 pvesm status
 
 # Typical setup:
-# pve-nas (NFS)     - Shared storage for templates
-# local-lvm (LVM)   - Local storage for VMs
-# local (Directory) - Local storage for ISOs/backups
+# shared-storage (NFS)  - Shared storage for templates
+# local-lvm (LVM)       - Local storage for VMs
+# local (Directory)     - Local storage for ISOs/backups
 ```
 
 ## Console Configuration
@@ -137,18 +141,6 @@ This script configures templates with **VGA console** (`--vga std`) plus **seria
 | **VGA + Serial** | `--vga std --serial0 socket` | ✅ **Perfect**     | ✅ **Excellent** |
 | **Serial Only**  | `--vga serial0`              | ❌ Console issues  | ❌ Difficult     |
 
-### Why This Configuration?
-
-```bash
-# Script creates VMs with optimal console setup:
-qm create 9000 \
-  --vga std \          # VGA console for interactive access
-  --serial0 socket \   # Serial port for guest agent
-  --agent enabled=1    # QEMU guest agent enabled
-```
-
-**Result**: Perfect console access AND automation capabilities!
-
 ## Basic Usage
 
 ### Command Syntax
@@ -157,7 +149,7 @@ qm create 9000 \
 ./create-cloud-template.sh [OPTIONS]
 
 # Required: Run as root on Proxmox host
-sudo ./create-cloud-template.sh --vmid 9000 --name debian-12 --storage pve-nas
+sudo ./cloud-templates/create-cloud-template.sh --vmid 9000 --name debian-12 --storage local-lvm
 ```
 
 ### Available Options
@@ -170,7 +162,7 @@ sudo ./create-cloud-template.sh --vmid 9000 --name debian-12 --storage pve-nas
 | `--image-url`   | Cloud image URL               | Debian 12 latest      | See examples below                 |
 | `--memory`      | RAM in MB                     | 1024                  | `--memory 2048`                    |
 | `--cores`       | CPU cores                     | 1                     | `--cores 2`                        |
-| `--storage`     | Storage name                  | local-lvm             | `--storage pve-nas`                |
+| `--storage`     | Storage name                  | local-lvm             | `--storage shared-storage`         |
 | `--bridge`      | Network bridge                | vmbr0                 | `--bridge vmbr1`                   |
 | `--cleanup`     | Remove downloads              | enabled               | `--cleanup`                        |
 | `--no-cleanup`  | Keep downloads                | disabled              | `--no-cleanup`                     |
@@ -182,19 +174,19 @@ sudo ./create-cloud-template.sh --vmid 9000 --name debian-12 --storage pve-nas
 
 ```bash
 # Basic Debian 12 template with VGA console
-./create-cloud-template.sh \
+./cloud-templates/create-cloud-template.sh \
   --vmid 9000 \
   --name "debian-12-template" \
   --description "Debian 12 Bookworm Cloud Template with VGA Console" \
-  --storage "pve-nas" \
+  --storage "local-lvm" \
   --cleanup
 
 # High-resource Debian template
-./create-cloud-template.sh \
+./cloud-templates/create-cloud-template.sh \
   --vmid 9001 \
   --name "debian-12-large" \
   --description "Debian 12 with 2GB RAM, 2 cores, VGA Console" \
-  --storage "pve-nas" \
+  --storage "local-lvm" \
   --memory 2048 \
   --cores 2 \
   --cleanup
@@ -204,20 +196,20 @@ sudo ./create-cloud-template.sh --vmid 9000 --name debian-12 --storage pve-nas
 
 ```bash
 # Ubuntu 24.04 template with VGA console
-./create-cloud-template.sh \
+./cloud-templates/create-cloud-template.sh \
   --vmid 9010 \
   --name "ubuntu-24-template" \
   --description "Ubuntu 24.04 LTS Noble with VGA Console" \
-  --storage "pve-nas" \
+  --storage "local-lvm" \
   --image-url "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" \
   --cleanup
 
 # Ubuntu 22.04 LTS template
-./create-cloud-template.sh \
+./cloud-templates/create-cloud-template.sh \
   --vmid 9011 \
   --name "ubuntu-22-template" \
   --description "Ubuntu 22.04 LTS Jammy with VGA Console" \
-  --storage "pve-nas" \
+  --storage "local-lvm" \
   --image-url "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img" \
   --cleanup
 ```
@@ -226,344 +218,132 @@ sudo ./create-cloud-template.sh --vmid 9000 --name debian-12 --storage pve-nas
 
 ```bash
 # Rocky Linux 9 template with VGA console
-./create-cloud-template.sh \
+./cloud-templates/create-cloud-template.sh \
   --vmid 9020 \
   --name "rocky-9-template" \
   --description "Rocky Linux 9 with VGA Console" \
-  --storage "pve-nas" \
+  --storage "local-lvm" \
   --image-url "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2" \
   --cleanup
-
-# AlmaLinux 9 template
-./create-cloud-template.sh \
-  --vmid 9021 \
-  --name "alma-9-template" \
-  --description "AlmaLinux 9 with VGA Console" \
-  --storage "pve-nas" \
-  --image-url "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2" \
-  --cleanup
 ```
 
-### Batch Template Creation
+## VM Deployment Examples
+
+### Basic VM Deployment with Cloud-Init
 
 ```bash
-#!/bin/bash
-# create-all-templates.sh
-
-templates=(
-  "9000:debian-12:Debian 12 Bookworm:https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
-  "9010:ubuntu-24:Ubuntu 24.04 LTS:https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
-  "9011:ubuntu-22:Ubuntu 22.04 LTS:https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-  "9020:rocky-9:Rocky Linux 9:https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-)
-
-for template in "${templates[@]}"; do
-  IFS=':' read -r vmid name description url <<< "$template"
-
-  echo "Creating $name template (ID: $vmid) with VGA console..."
-  ./create-cloud-template.sh \
-    --vmid "$vmid" \
-    --name "$name-template" \
-    --description "$description Cloud Template with VGA Console" \
-    --storage "pve-nas" \
-    --image-url "$url" \
-    --cleanup \
-    --force
-
-  echo "✓ $name template completed"
-  echo "---"
-done
-
-echo "All templates with VGA console created successfully!"
-```
-
-## VM Cloning and Configuration
-
-### Basic VM Cloning
-
-```bash
-# Clone to local storage (same node)
+# 1. Clone template
 qm clone 9000 101 --name "web-server-01" --full --storage local-lvm
 
-# Clone to different node's local storage (run from target node)
-ssh pve02 'qm clone 9000 102 --name "web-server-02" --full --storage local-lvm'
-
-# Clone to different node with shared storage
-qm clone 9000 103 --name "shared-vm" --target pve02 --full --storage pve-nas
-```
-
-### VM Configuration Examples
-
-#### Basic DHCP Configuration with Console Access
-
-```bash
-# Clone and configure with DHCP
-qm clone 9000 101 --name "app-server" --full --storage local-lvm
-
+# 2. Configure with cloud-init (using repository cloud-init files)
 qm set 101 \
-  --ciuser ansible \
+  --ciuser admin \
   --cipassword "secure-password" \
+  --sshkeys /root/.ssh/id_rsa.pub \
   --ipconfig0 ip=dhcp \
-  --nameserver 8.8.8.8
+  --nameserver 8.8.8.8 \
+  --cicustom "user=local:snippets/basic-bootstrap.yml"
 
+# 3. Start VM
 qm start 101
 
-# Perfect console access with VGA configuration
+# 4. Access via perfect console (VGA configured)
 qm terminal 101
-# Login: ansible / secure-password
-# Check IP: ip addr show
+# Login: admin / secure-password (or SSH with keys)
+# Check status: server-status
 ```
 
-#### Static IP Configuration with Console Access
+### Static IP Configuration
 
 ```bash
 # Clone and configure with static IP
 qm clone 9000 102 --name "db-server" --full --storage local-lvm
 
 qm set 102 \
-  --ciuser ansible \
+  --ciuser admin \
   --cipassword "secure-password" \
+  --sshkeys /root/.ssh/id_rsa.pub \
   --ipconfig0 ip=10.10.1.100/24,gw=10.10.1.1 \
   --nameserver 10.10.1.1,8.8.8.8 \
-  --searchdomain local.domain
+  --cicustom "user=local:snippets/enhanced-bootstrap.yml"
 
 qm start 102
 
 # Console access for verification
 qm terminal 102
-# Login: ansible / secure-password
-# Verify: ping google.com
+# Verify: ping google.com, docker --version
 ```
 
-#### SSH Key Configuration with Console Backup
+### Development Server Deployment
 
 ```bash
-# Clone and configure with SSH keys
-qm clone 9000 103 --name "secure-server" --full --storage local-lvm
+# Clone with more resources for development
+qm clone 9000 103 --name "dev-server" --full --storage local-lvm
 
 qm set 103 \
-  --ciuser ansible \
+  --ciuser admin \
+  --cipassword "dev-password" \
   --sshkeys /root/.ssh/id_rsa.pub \
   --ipconfig0 ip=dhcp \
-  --nameserver 8.8.8.8
+  --nameserver 8.8.8.8 \
+  --memory 4096 \
+  --cores 2 \
+  --cicustom "user=local:snippets/enhanced-bootstrap.yml"
 
 qm start 103
 
-# Check IP via console (VGA makes this easy)
+# Access development environment
 qm terminal 103
-# Note: SSH key auth only, may need to set password for console access
-```
-
-#### **Recommended: Combined Configuration (SSH Keys + Password)**
-
-```bash
-# Clone with both SSH keys and password (BEST PRACTICE)
-qm clone 9000 104 --name "production-server" --full --storage local-lvm
-
-qm set 104 \
-  --ciuser ansible \
-  --cipassword "backup-password" \
-  --sshkeys /root/.ssh/id_rsa.pub \
-  --ipconfig0 ip=10.10.1.200/24,gw=10.10.1.1 \
-  --nameserver 10.10.1.1,8.8.8.8 \
-  --description "Production server with dual authentication and VGA console"
-
-qm start 104
-
-# Multiple access methods available:
-# Console access: qm terminal 104 (ansible/backup-password)
-# SSH access: ssh ansible@10.10.1.200 (key-based)
-# Web console: Proxmox UI > VM 104 > Console (noVNC/SPICE)
+# Available: Docker, Python, Node.js, development tools
 ```
 
 ## SSH Key Setup
 
-### Setting Up SSH Keys
-
-#### From Your Workstation (Mac/Linux)
+### Setting Up SSH Keys on Proxmox
 
 ```bash
-# Generate SSH key if you don't have one
-ssh-keygen -t rsa -b 4096 -C "your-email@domain.com"
-
-# Copy public key to Proxmox
-scp ~/.ssh/id_rsa.pub root@pve01:/root/.ssh/id_rsa.pub
-
-# Set up SSH directories on Proxmox
-ssh root@pve01 '
-mkdir -p /root/.ssh /home/ansible/.ssh
-chmod 700 /root/.ssh /home/ansible/.ssh
-cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
-cp /root/.ssh/id_rsa.pub /home/ansible/.ssh/authorized_keys
-chmod 600 /root/.ssh/authorized_keys /home/ansible/.ssh/authorized_keys
-chown ansible:ansible /home/ansible/.ssh/authorized_keys
-'
-
-# Test SSH access
-ssh root@pve01 'echo "SSH working!"'
-```
-
-#### On Proxmox Host
-
-```bash
-# Generate SSH key on Proxmox
+# Generate SSH key on Proxmox if you don't have one
 ssh-keygen -t rsa -b 4096 -f /root/.ssh/id_rsa -N ""
 
-# Set up for both root and ansible users
+# Set up authorized_keys
 cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
-mkdir -p /home/ansible/.ssh
-cp /root/.ssh/id_rsa.pub /home/ansible/.ssh/authorized_keys
-chown -R ansible:ansible /home/ansible/.ssh
-chmod 700 /home/ansible/.ssh
-chmod 600 /home/ansible/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+
+# Test SSH key setup
+ssh-add /root/.ssh/id_rsa
 ```
 
-## Cloud-Init Configuration
+## Cloud-Init Integration
 
-### Basic Cloud-Init Options
+### Using Repository Cloud-Init Files
+
+This repository includes ready-to-use cloud-init configurations:
 
 ```bash
-# User and authentication
---ciuser <username>              # Default user (e.g., ansible, ubuntu, admin)
---cipassword <password>          # Password for console access (recommended with VGA)
---sshkeys <key_file>             # SSH public key file
+# 1. Copy cloud-init files to snippets storage
+cp cloud-init/*.yml /var/lib/vz/snippets/
+chmod 644 /var/lib/vz/snippets/*.yml
 
-# Network configuration
---ipconfig0 ip=dhcp              # DHCP configuration
---ipconfig0 ip=10.1.1.100/24,gw=10.1.1.1  # Static IP
---nameserver <dns_servers>       # DNS servers (comma-separated)
---searchdomain <domain>          # DNS search domain
+# 2. Enable snippets content type
+pvesm set local -content backup,vztmpl,iso,snippets
 
-# Advanced options
---citype <type>                  # Cloud-init type (nocloud, configdrive)
---cicustom <options>             # Custom cloud-init files
+# 3. Deploy VMs with cloud-init
+qm clone 9000 101 --name my-vm --full --storage local-lvm
+qm set 101 --cicustom "user=local:snippets/basic-bootstrap.yml" --ciuser admin --ipconfig0 ip=dhcp
+qm start 101
 ```
 
-### Advanced Cloud-Init Examples
-
-#### Multi-Network Configuration
+### Cloud-Init Options
 
 ```bash
-# Configure multiple network interfaces
-qm set 105 \
-  --ciuser ansible \
-  --cipassword "password123" \
-  --ipconfig0 ip=10.10.1.100/24,gw=10.10.1.1 \
-  --ipconfig1 ip=192.168.1.100/24 \
-  --nameserver 10.10.1.1,8.8.8.8
-
-# Add second network interface
-qm set 105 --net1 virtio,bridge=vmbr1
-
-# Verify via console
-qm terminal 105
-# Inside VM: ip addr show
-```
-
-#### Custom User Data with VM Tools
-
-```bash
-# Create custom user data file for QEMU guest agent
-cat > /var/lib/vz/snippets/install-tools.yml << 'EOF'
-#cloud-config
-package_update: true
-package_upgrade: true
-packages:
-  - qemu-guest-agent
-  - curl
-  - wget
-  - vim
-  - htop
-  - net-tools
-
-runcmd:
-  - systemctl enable qemu-guest-agent
-  - systemctl start qemu-guest-agent
-  - timedatectl set-timezone America/New_York
-
-write_files:
-  - content: |
-      Welcome to the automated server!
-      Generated on $(date)
-      Console access: VGA configured
-      Guest agent: Enabled
-    path: /etc/motd
-    permissions: '0644'
-EOF
-
-# Use custom user data
-qm set 106 \
-  --ciuser ansible \
-  --cipassword "password123" \
-  --ipconfig0 ip=dhcp \
-  --cicustom "user=local:snippets/install-tools.yml"
-
-qm start 106
-
-# Monitor installation via console
-qm terminal 106
-# Check guest agent: systemctl status qemu-guest-agent
-```
-
-### Installing QEMU Guest Agent
-
-#### Via Cloud-Init (Recommended)
-
-```bash
-# Create cloud-init script to install guest agent
-cat > /var/lib/vz/snippets/install-agent.yml << 'EOF'
-#cloud-config
-package_update: true
-packages:
-  - qemu-guest-agent
-
-runcmd:
-  - systemctl enable qemu-guest-agent
-  - systemctl start qemu-guest-agent
-  - echo "Guest agent installed and started" >> /tmp/cloud-init.log
-EOF
-
-# Configure VM to use the script
-qm set 107 \
-  --ciuser ansible \
-  --cipassword "password123" \
-  --ipconfig0 ip=dhcp \
-  --cicustom "user=local:snippets/install-agent.yml"
-
-qm start 107
-
-# Watch installation via console
-qm terminal 107
-# After boot: sudo systemctl status qemu-guest-agent
-```
-
-#### Manual Installation (Easy with VGA Console)
-
-```bash
-# Console into VM (VGA console makes this easy)
-qm terminal 107
-# Login: ansible/password123
-
-# Or SSH into VM
-ssh ansible@<vm_ip>
-
-# Debian/Ubuntu
-sudo apt update
-sudo apt install -y qemu-guest-agent
-sudo systemctl enable qemu-guest-agent
-sudo systemctl start qemu-guest-agent
-
-# Rocky Linux/AlmaLinux
-sudo dnf install -y qemu-guest-agent
-sudo systemctl enable qemu-guest-agent
-sudo systemctl start qemu-guest-agent
-
-# Verify installation
-sudo systemctl status qemu-guest-agent
-
-# Test guest agent functionality (from Proxmox host)
-qm guest cmd 107 network-get-interfaces
-qm guest cmd 107 info
+# Basic configuration
+--ciuser admin                              # Default user
+--cipassword "password"                     # Password for console access
+--sshkeys /root/.ssh/id_rsa.pub            # SSH public key file
+--ipconfig0 ip=dhcp                         # DHCP configuration
+--ipconfig0 ip=10.1.1.100/24,gw=10.1.1.1   # Static IP
+--nameserver 8.8.8.8,1.1.1.1              # DNS servers
+--cicustom "user=local:snippets/file.yml"  # Custom cloud-init file
 ```
 
 ## Cluster Operations
@@ -571,62 +351,19 @@ qm guest cmd 107 info
 ### Template Management Across Nodes
 
 ```bash
-# List templates cluster-wide
-pvesh get /cluster/resources --type vm | grep template
+# Create template on shared storage (accessible from all nodes)
+./cloud-templates/create-cloud-template.sh \
+  --vmid 9000 \
+  --name "debian-12-cluster" \
+  --storage "shared-storage"
 
-# Check template accessibility from different nodes
-for node in pve01 pve02 pve03; do
-  echo "Node: $node"
-  ssh $node 'qm list | grep template'
-  echo "Console test: ssh $node \"qm terminal <vmid>\""
-  echo "---"
-done
+# Deploy VMs from any cluster node
+ssh pve02 'qm clone 9000 201 --name web-server-node2 --full --storage local-lvm'
+ssh pve03 'qm clone 9000 301 --name web-server-node3 --full --storage local-lvm'
 
-# Backup templates
-vzdump 9000 9010 9020 --storage pve-nas --compress zstd
-```
-
-### Cross-Node VM Deployment with Console Access
-
-```bash
-# Deploy VMs across cluster nodes
-nodes=("pve01" "pve02" "pve03")
-template_id=9000
-
-for i in {0..2}; do
-  node=${nodes[$i]}
-  vm_id=$((201 + i))
-
-  echo "Deploying VM $vm_id on $node with VGA console..."
-  ssh $node "qm clone $template_id $vm_id --name web-$node --full --storage local-lvm"
-  ssh $node "qm set $vm_id --ciuser ansible --cipassword password123 --ipconfig0 ip=dhcp"
-  ssh $node "qm start $vm_id"
-
-  # Console access available on each node
-  echo "Console access: ssh $node 'qm terminal $vm_id'"
-  echo "Web console: https://$node:8006 > VM $vm_id > Console"
-done
-```
-
-### High Availability Setup
-
-```bash
-# Create HA-enabled VMs with console access
-qm clone 9000 301 --name "ha-web-01" --full --storage pve-nas
-
-qm set 301 \
-  --ciuser ansible \
-  --cipassword "ha-password" \
-  --ipconfig0 ip=10.10.1.101/24,gw=10.10.1.1
-
-# Add to HA group
-ha-manager add vm:301 --state started --group production
-
-qm start 301
-
-# Console access works regardless of which node it's running on
-qm terminal 301
-# Web console also available from any cluster node
+# Configure and start from respective nodes
+ssh pve02 'qm set 201 --cicustom "user=shared-storage:snippets/basic-bootstrap.yml" --ciuser admin'
+ssh pve02 'qm start 201'
 ```
 
 ## Troubleshooting
@@ -637,7 +374,7 @@ With VGA console configuration, troubleshooting is much easier:
 
 ```bash
 # Perfect console access for troubleshooting
-qm terminal 201
+qm terminal 101
 
 # Inside VM console (no login issues):
 # - Check network: ip addr show
@@ -653,16 +390,16 @@ qm terminal 201
 
 ```bash
 # Check storage space
-pvesm status -storage pve-nas
+pvesm status -storage local-lvm
 
 # Verify network connectivity
 curl -I https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
 
 # Check permissions
-ls -la /mnt/pve/pve-nas/
+ls -la /var/lib/vz/template/
 
 # Test write access
-touch /mnt/pve/pve-nas/test-file && rm /mnt/pve/pve-nas/test-file
+touch /var/lib/vz/template/test-file && rm /var/lib/vz/template/test-file
 ```
 
 #### VM Won't Start
@@ -680,39 +417,6 @@ qm rescan
 
 # View VM logs
 tail -f /var/log/pve/tasks/active
-
-# Console into VM for direct troubleshooting
-qm terminal <vmid>
-```
-
-#### Console Access Issues (Rare with VGA)
-
-```bash
-# If console still shows issues (very rare)
-qm stop 201
-qm set 201 --vga std  # Ensure VGA is set
-qm start 201
-qm terminal 201
-
-# Alternative: Use Proxmox web console
-# Web UI > VM > Console > Select "noVNC" or "SPICE"
-```
-
-#### SSH Connection Issues
-
-```bash
-# Use console to check VM network (VGA advantage)
-qm terminal <vmid>
-# Inside VM:
-ip addr show
-ping google.com
-systemctl status sshd
-
-# Verify SSH key setup from Proxmox
-cat /root/.ssh/id_rsa.pub
-
-# Check guest agent (if installed)
-qm guest cmd <vmid> network-get-interfaces
 ```
 
 #### Cloud-Init Not Working
@@ -727,39 +431,13 @@ sudo cloud-init logs
 
 # Check detailed logs
 sudo cat /var/log/cloud-init-output.log
-sudo journalctl -u cloud-init
 
 # Regenerate cloud-init
 sudo cloud-init clean
 sudo reboot
-
-# Monitor reboot via console
-qm terminal <vmid>
-```
-
-### Debug Mode
-
-```bash
-# Run script with debug output
-bash -x ./create-cloud-template.sh --vmid 9999 --name debug-test
-
-# Test VM configuration
-qm config 9999 | grep -E "(vga|serial|agent)"
-# Should show:
-# agent: 1
-# serial0: socket
-# vga: std
 ```
 
 ## Best Practices
-
-### Console Configuration Best Practices
-
-1. **Always Use VGA Console**: Best for Proxmox interactive management
-2. **Keep Serial Port**: Maintain guest agent functionality (`--serial0 socket`)
-3. **Dual Authentication**: SSH keys + password for maximum flexibility
-4. **Test Console Access**: Verify `qm terminal` works before production
-5. **Document Access Methods**: Both console and SSH for different scenarios
 
 ### Template Management
 
@@ -768,7 +446,6 @@ qm config 9999 | grep -E "(vga|serial|agent)"
 3. **Version Templates**: Include date/version in description
 4. **Regular Updates**: Refresh templates monthly with latest images
 5. **Backup Templates**: Regular backup schedule for template storage
-6. **Test Console Access**: Verify console works on new templates
 
 ### VM Deployment
 
@@ -777,16 +454,6 @@ qm config 9999 | grep -E "(vga|serial|agent)"
 3. **Console Access**: Always include password for console troubleshooting
 4. **Network Segmentation**: Use appropriate VLANs and bridges
 5. **Security**: SSH keys for automation, passwords for console access
-6. **Monitoring**: Implement proper monitoring and alerting
-
-### Security Considerations
-
-1. **Dual Authentication**: SSH keys for automation, passwords for console
-2. **Console Security**: Use strong passwords for console access
-3. **User Management**: Create dedicated service accounts
-4. **Network Security**: Implement firewalls and network policies
-5. **Updates**: Regular security updates via cloud-init or automation
-6. **Access Control**: Limit Proxmox API access and permissions
 
 ### Performance Optimization
 
@@ -795,18 +462,10 @@ qm config 9999 | grep -E "(vga|serial|agent)"
 3. **CPU**: Match CPU type to workload requirements
 4. **Memory**: Avoid over-allocation, use balloon driver
 5. **Network**: Use virtio drivers for best performance
-6. **Guest Agents**: Install QEMU guest agent for better management
 
-### Automation Ready
+## 🔮 Advanced Automation (Optional)
 
-This VGA console setup provides the foundation for:
-
-- **Interactive Management**: Easy troubleshooting via console
-- **Terraform**: Infrastructure as Code
-- **Ansible**: Configuration management via SSH
-- **CI/CD Pipelines**: Automated deployments
-- **Kubernetes**: Container orchestration platforms
-- **Monitoring**: Prometheus, Grafana, etc.
+Once comfortable with manual template creation and VM deployment, you can integrate with Infrastructure as Code tools like **Terraform** for even greater automation. The templates and cloud-init files work perfectly with automation tools.
 
 ---
 
@@ -816,82 +475,20 @@ This VGA console setup provides the foundation for:
 
 ```bash
 # Create template with VGA console
-./create-cloud-template.sh --vmid 9000 --name debian-12 --storage pve-nas
+./cloud-templates/create-cloud-template.sh --vmid 9000 --name debian-12 --storage local-lvm
 
-# Clone VM
+# Set up cloud-init files
+cp cloud-init/*.yml /var/lib/vz/snippets/
+pvesm set local -content backup,vztmpl,iso,snippets
+
+# Clone and deploy VM
 qm clone 9000 101 --name my-vm --full --storage local-lvm
-
-# Configure cloud-init (dual auth recommended)
-qm set 101 --ciuser ansible --cipassword pass123 --sshkeys /root/.ssh/id_rsa.pub --ipconfig0 ip=dhcp
-
-# Start VM
+qm set 101 --cicustom "user=local:snippets/basic-bootstrap.yml" --ciuser admin --ipconfig0 ip=dhcp
 qm start 101
 
-# Console access (VGA configured - no issues)
-qm terminal 101
-
-# Check status
-qm status 101
-
-# Get IP (multiple methods)
-qm terminal 101  # Then: ip addr show
-qm guest cmd 101 network-get-interfaces  # If guest agent installed
-
-# SSH to VM
-ssh ansible@<vm-ip>
+# Access VM
+qm terminal 101  # Perfect console access
+ssh admin@<vm-ip>  # SSH access with keys
 ```
 
-### Console Access Methods
-
-```bash
-# Direct console access (VGA)
-qm terminal <vmid>
-
-# Web console access
-# Proxmox Web UI > VM > Console > noVNC/SPICE
-
-# SSH access (key-based)
-ssh ansible@<vm-ip>
-
-# Emergency console access
-# Physical console if available
-```
-
-### Template Configuration
-
-| Component | Setting                      | Purpose                      |
-| --------- | ---------------------------- | ---------------------------- |
-| VGA       | `--vga std`                  | Interactive console access   |
-| Serial    | `--serial0 socket`           | Guest agent functionality    |
-| Agent     | `--agent enabled=1`          | VM management and monitoring |
-| Network   | `--net0 virtio,bridge=vmbr0` | Network connectivity         |
-
-### Useful Templates
-
-| Template ID | OS            | Console      | Use Case                        |
-| ----------- | ------------- | ------------ | ------------------------------- |
-| 9000        | Debian 12     | VGA + Serial | General purpose, web servers    |
-| 9010        | Ubuntu 24.04  | VGA + Serial | Modern applications, containers |
-| 9011        | Ubuntu 22.04  | VGA + Serial | LTS stability, enterprise       |
-| 9020        | Rocky Linux 9 | VGA + Serial | Enterprise Linux, legacy apps   |
-
-### Storage Layout
-
-```
-pve-nas (shared)     -> Templates (9000-9999) with VGA console
-local-lvm (local)    -> Production VMs (100-999)
-local (directory)    -> ISOs, backups
-```
-
-### Troubleshooting Quick Guide
-
-| Issue                  | Solution                              |
-| ---------------------- | ------------------------------------- |
-| Console won't open     | `qm terminal <vmid>` (VGA configured) |
-| Can't see boot process | VGA console shows everything          |
-| Need to check IP       | Console: `ip addr show`               |
-| SSH not working        | Console: check network, SSH status    |
-| Cloud-init failed      | Console: `sudo cloud-init logs`       |
-| VM won't boot          | Console: watch boot process           |
-
-This comprehensive setup with **VGA console configuration** provides the perfect foundation for Proxmox virtualization with excellent interactive access and full automation capabilities!
+This comprehensive setup with **VGA console configuration** provides the perfect foundation for Proxmox virtualization with excellent interactive access and automation capabilities!
