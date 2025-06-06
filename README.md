@@ -39,8 +39,12 @@ Ready-to-use cloud-init configurations for automated server setup.
 
 ### Step 1: Clone Repository on Proxmox Server
 
+You can clone this repository to any location that works for your setup:
+
+#### Option A: Clone to /opt (Local Storage)
+
 ```bash
-# Clone repository directly on Proxmox server
+# Clone to local /opt directory
 cd /opt
 git clone https://github.com/dougjaworski/proxmox-scripts.git
 cd proxmox-scripts
@@ -49,9 +53,47 @@ cd proxmox-scripts
 chmod +x cloud-templates/*.sh
 ```
 
+#### Option B: Clone to NAS/Shared Storage (Recommended for Clusters)
+
+```bash
+# First, check what storage/NAS is mounted
+df -h
+# Or view Proxmox storage
+pvesm status
+
+# Example: Clone to NFS share
+cd /mnt/pve/your-nas-name
+git clone https://github.com/dougjaworski/proxmox-scripts.git
+cd proxmox-scripts
+
+# Make scripts executable
+chmod +x cloud-templates/*.sh
+```
+
+#### Viewing Your NAS/Storage Options
+
+```bash
+# View all mounted storage
+df -h | grep -E "(mnt|pve)"
+
+# View Proxmox configured storage
+pvesm status
+
+# List contents of a specific NAS/storage
+ls -la /mnt/pve/
+# Example output might show: pve-nas, shared-storage, backup-storage, etc.
+
+# Choose your preferred location and clone there
+cd /mnt/pve/your-preferred-storage
+git clone https://github.com/dougjaworski/proxmox-scripts.git
+```
+
 ### Step 2: Create Templates
 
 ```bash
+# Navigate to your repository location
+cd /your/repository/location/proxmox-scripts
+
 # Create a Debian 12 template with VGA console
 ./cloud-templates/create-cloud-template.sh \
   --vmid 9000 \
@@ -62,11 +104,11 @@ chmod +x cloud-templates/*.sh
 ### Step 3: Install Cloud-Init Files
 
 ```bash
-# Copy cloud-init files to snippets storage
-cp cloud-init/*.yml /var/lib/vz/snippets/
+# From your repository location, copy cloud-init files to snippets storage
+cp /your/repository/location/proxmox-scripts/cloud-init/*.yml /var/lib/vz/snippets/
 
 # For shared storage (if using)
-# cp cloud-init/*.yml /mnt/pve/your-shared-storage/snippets/
+# cp /your/repository/location/proxmox-scripts/cloud-init/*.yml /mnt/pve/your-shared-storage/snippets/
 
 # Set proper permissions
 chmod 644 /var/lib/vz/snippets/*.yml
@@ -130,6 +172,28 @@ server-status
 - VM deployment examples
 - SSH key setup and customization
 
+## 🔧 Installation
+
+### Clone Repository to Your Preferred Location
+
+You have flexibility in where to store the repository:
+
+- **Local storage** (`/opt`): Good for single-node setups
+- **NAS/Shared storage** (`/mnt/pve/your-nas`): Recommended for clusters, scripts accessible from all nodes
+- **Any writable location**: Choose what works best for your environment
+
+```bash
+# View available storage options
+df -h | grep -E "(mnt|pve)"
+pvesm status
+
+# Choose your location and clone
+cd /your/preferred/location
+git clone https://github.com/dougjaworski/proxmox-scripts.git
+cd proxmox-scripts
+chmod +x cloud-templates/*.sh
+```
+
 ## 🔧 Prerequisites
 
 - **Proxmox VE 7.0+** (tested on 8.4.0)
@@ -158,7 +222,8 @@ server-status
 ### Common Commands
 
 ```bash
-# Create template
+# Create template (from your repository location)
+cd /your/repository/location/proxmox-scripts
 ./cloud-templates/create-cloud-template.sh --vmid 9000 --name debian-12
 
 # Copy cloud-init files
