@@ -41,7 +41,23 @@ Ready-to-use cloud-init configurations for automated server setup.
 
 You can clone this repository to any location that works for your setup:
 
-#### Option A: Clone to /opt (Local Storage)
+#### Option A: Clone to NAS/Shared Storage (Recommended for Clusters)
+
+```bash
+# Check what NAS/shared storage is available
+pvesm status
+df -h | grep -E "(mnt|pve)"
+
+# Clone to your NAS storage
+cd /mnt/pve/pve-nas  # Replace 'pve-nas' with your NAS storage name
+git clone https://github.com/dougjaworski/proxmox-scripts.git
+cd proxmox-scripts
+
+# Make scripts executable
+chmod +x cloud-templates/*.sh
+```
+
+#### Option B: Clone to /opt (Local Storage)
 
 ```bash
 # Clone to local /opt directory
@@ -53,46 +69,11 @@ cd proxmox-scripts
 chmod +x cloud-templates/*.sh
 ```
 
-#### Option B: Clone to NAS/Shared Storage (Recommended for Clusters)
-
-```bash
-# First, check what storage/NAS is mounted
-df -h
-# Or view Proxmox storage
-pvesm status
-
-# Example: Clone to NFS share
-cd /mnt/pve/your-nas-name
-git clone https://github.com/dougjaworski/proxmox-scripts.git
-cd proxmox-scripts
-
-# Make scripts executable
-chmod +x cloud-templates/*.sh
-```
-
-#### Viewing Your NAS/Storage Options
-
-```bash
-# View all mounted storage
-df -h | grep -E "(mnt|pve)"
-
-# View Proxmox configured storage
-pvesm status
-
-# List contents of a specific NAS/storage
-ls -la /mnt/pve/
-# Example output might show: pve-nas, shared-storage, backup-storage, etc.
-
-# Choose your preferred location and clone there
-cd /mnt/pve/your-preferred-storage
-git clone https://github.com/dougjaworski/proxmox-scripts.git
-```
-
 ### Step 2: Create Templates
 
 ```bash
 # Navigate to your repository location
-cd /your/repository/location/proxmox-scripts
+cd /mnt/pve/pve-nas/proxmox-scripts  # Or wherever you cloned it
 
 # Create a Debian 12 template with VGA console
 ./cloud-templates/create-cloud-template.sh \
@@ -103,49 +84,93 @@ cd /your/repository/location/proxmox-scripts
 
 ### Step 3: Install Cloud-Init Files
 
-```bash
-# From your repository location, copy cloud-init files to snippets storage
-cp /your/repository/location/proxmox-scripts/cloud-init/*.yml /var/lib/vz/snippets/
+#### Check Your Storage Setup First
 
-# For shared storage (if using)
-# cp /your/repository/location/proxmox-scripts/cloud-init/*.yml /mnt/pve/your-shared-storage/snippets/
+```bash
+# Check which storage has snippets support enabled
+pvesm status
+
+# Look for storage with 'snippets' in the content types
+# Example: pve-nas might show "backup,images,snippets"
+```
+
+#### If Your NAS Already Has Snippets Support (Recommended)
+
+```bash
+# Copy cloud-init files to your NAS snippets directory
+cp cloud-init/*.yml /mnt/pve/pve-nas/snippets/  # Replace 'pve-nas' with your NAS name
+
+# Set proper permissions
+chmod 644 /mnt/pve/pve-nas/snippets/*.yml
+
+# Verify files are in place
+ls -la /mnt/pve/pve-nas/snippets/*.yml
+```
+
+#### If Using Local Storage for Snippets
+
+```bash
+# Copy cloud-init files to local snippets directory
+cp cloud-init/*.yml /var/lib/vz/snippets/
+
+# Enable snippets content type on local storage
+pvesm set local -content backup,vztmpl,iso,snippets
 
 # Set proper permissions
 chmod 644 /var/lib/vz/snippets/*.yml
 ```
 
-### Step 4: Enable Snippets Content Type
-
-Ensure your storage supports snippets:
+#### If Your NAS Needs Snippets Enabled
 
 ```bash
-# Add snippets content type to local storage
-pvesm set local -content backup,vztmpl,iso,snippets
+# Enable snippets on your NAS storage
+pvesm set pve-nas -content backup,images,snippets  # Replace 'pve-nas' with your storage name
 
 # Verify it worked
-pvesm status -storage local
+pvesm status -storage pve-nas
 ```
 
-### Step 5: Deploy VMs with Cloud-Init
+### Step 4: Deploy VMs with Cloud-Init
+
+#### Using NAS Storage for Cloud-Init (Cluster-Friendly)
 
 ```bash
 # Clone template
 qm clone 9000 101 --name "my-server" --full --storage local-lvm
 
-# Configure with cloud-init
+# Configure with cloud-init from NAS storage
 qm set 101 \
   --ciuser admin \
   --cipassword "changeme123" \
   --sshkeys /root/.ssh/id_rsa.pub \
   --ipconfig0 ip=dhcp \
   --nameserver 8.8.8.8 \
-  --cicustom "user=local:snippets/basic-bootstrap.yml"
+  --cicustom "user=pve-nas:snippets/basic-bootstrap.yml"  # Reference your NAS storage
 
 # Start the VM
 qm start 101
 ```
 
-### Step 6: Access Your Server
+#### Using Local Storage for Cloud-Init
+
+```bash
+# Clone template
+qm clone 9000 102 --name "my-server-local" --full --storage local-lvm
+
+# Configure with cloud-init from local storage
+qm set 102 \
+  --ciuser admin \
+  --cipassword "changeme123" \
+  --sshkeys /root/.ssh/id_rsa.pub \
+  --ipconfig0 ip=dhcp \
+  --nameserver 8.8.8.8 \
+  --cicustom "user=local:snippets/basic-bootstrap.yml"  # Reference local storage
+
+# Start the VM
+qm start 102
+```
+
+### Step 5: Access Your Server
 
 ```bash
 # Perfect console access (VGA optimized)
@@ -178,8 +203,8 @@ server-status
 
 You have flexibility in where to store the repository:
 
-- **Local storage** (`/opt`): Good for single-node setups
 - **NAS/Shared storage** (`/mnt/pve/your-nas`): Recommended for clusters, scripts accessible from all nodes
+- **Local storage** (`/opt`): Good for single-node setups
 - **Any writable location**: Choose what works best for your environment
 
 ```bash
@@ -223,15 +248,18 @@ chmod +x cloud-templates/*.sh
 
 ```bash
 # Create template (from your repository location)
-cd /your/repository/location/proxmox-scripts
+cd /mnt/pve/pve-nas/proxmox-scripts  # Or your chosen location
 ./cloud-templates/create-cloud-template.sh --vmid 9000 --name debian-12
 
-# Copy cloud-init files
+# Copy cloud-init files to NAS snippets (recommended for clusters)
+cp cloud-init/*.yml /mnt/pve/pve-nas/snippets/
+
+# OR copy to local snippets
 cp cloud-init/*.yml /var/lib/vz/snippets/
 
-# Clone and configure VM
+# Clone and configure VM (NAS example)
 qm clone 9000 101 --name my-vm --full --storage local-lvm
-qm set 101 --cicustom "user=local:snippets/basic-bootstrap.yml" --ciuser admin --ipconfig0 ip=dhcp
+qm set 101 --cicustom "user=pve-nas:snippets/basic-bootstrap.yml" --ciuser admin --ipconfig0 ip=dhcp
 qm start 101
 
 # Access VM
@@ -241,10 +269,10 @@ ssh admin@<vm-ip>
 
 ### Cloud-Init File Locations
 
-| Storage Type | Snippets Directory               | VM Reference                        |
-| ------------ | -------------------------------- | ----------------------------------- |
-| Local        | `/var/lib/vz/snippets/`          | `local:snippets/filename.yml`       |
-| Shared NFS   | `/mnt/pve/nfs-storage/snippets/` | `nfs-storage:snippets/filename.yml` |
+| Setup Type        | Snippets Directory           | VM Reference                    | Best For     |
+| ----------------- | ---------------------------- | ------------------------------- | ------------ |
+| **NAS Storage**   | `/mnt/pve/pve-nas/snippets/` | `pve-nas:snippets/filename.yml` | **Clusters** |
+| **Local Storage** | `/var/lib/vz/snippets/`      | `local:snippets/filename.yml`   | Single nodes |
 
 ## 🎯 Use Cases
 
@@ -280,9 +308,9 @@ The template creation script + cloud-init files provide:
 
 ### Before First Use
 
-1. **Clone repository** on Proxmox server
+1. **Clone repository** on Proxmox server (NAS or local)
 2. **Copy cloud-init files** to snippets storage
-3. **Enable snippets content type** on your storage
+3. **Check snippets support** on your storage
 4. **Update SSH keys** in the YAML files
 5. **Test with one VM** before scaling
 
@@ -290,7 +318,14 @@ The template creation script + cloud-init files provide:
 
 - **Templates**: Shared storage for cluster-wide access
 - **VMs**: Local storage for best performance
-- **Cloud-init files**: Snippets storage (local or shared)
+- **Cloud-init files**: NAS snippets storage for clusters, local for single nodes
+
+### NAS Storage Benefits (Recommended for Clusters)
+
+- ✅ **All cluster nodes** can access the same cloud-init files
+- ✅ **Centralized management** - edit once, available everywhere
+- ✅ **Consistent deployments** across all nodes
+- ✅ **Backed up** with your NAS backup strategy
 
 ## 🔮 Advanced Automation (Optional)
 
