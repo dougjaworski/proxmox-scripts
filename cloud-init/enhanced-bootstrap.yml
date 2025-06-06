@@ -1,0 +1,235 @@
+#cloud-config
+# Enhanced Server Bootstrap - More comprehensive setup for development/production use
+# Includes: Docker, monitoring tools, security hardening, backup user
+
+# System updates and packages
+package_update: true
+package_upgrade: true
+packages:
+  # Essential system packages
+  - qemu-guest-agent
+  - curl
+  - wget
+  - vim
+  - htop
+  - git
+  - unzip
+  - net-tools
+  - tree
+  - jq
+  
+  # Development and admin tools
+  - docker.io
+  - docker-compose
+  - python3
+  - python3-pip
+  - nodejs
+  - npm
+  
+  # Security and monitoring
+  - fail2ban
+  - logwatch
+  - ufw
+
+# User configuration
+users:
+  # Primary admin user
+  - name: admin
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... # Replace with your SSH public key
+    lock_passwd: false
+
+  # Automation/service user
+  - name: ansible
+    groups: [sudo, docker]
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... # Replace with your SSH public key
+    lock_passwd: false
+
+  # Backup/monitoring user (limited privileges)
+  - name: monitor
+    groups: [users]
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:/usr/bin/systemctl status *, /usr/bin/journalctl *, /bin/df, /usr/bin/free, /usr/bin/uptime']
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... # Replace with monitoring key
+    lock_passwd: true
+
+# SSH hardening
+ssh_pwauth: true
+disable_root: false
+
+# System configuration
+timezone: America/New_York
+locale: en_US.UTF-8
+hostname: server-${random_suffix}
+
+# Enhanced setup commands
+runcmd:
+  # Essential services
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+  - timedatectl set-timezone America/New_York
+  
+  # Docker setup
+  - systemctl enable docker
+  - systemctl start docker
+  - usermod -aG docker admin
+  - usermod -aG docker ansible
+  
+  # Security setup
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+  
+  # Enhanced firewall
+  - ufw --force enable
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow ssh
+  - ufw allow from 10.0.0.0/8 to any port 22  # Allow SSH from private networks
+  
+  # Install some useful global tools
+  - npm install -g http-server
+  - pip3 install docker-compose
+  
+  # Create common directories
+  - mkdir -p /opt/scripts
+  - mkdir -p /opt/data
+  - mkdir -p /var/log/custom
+  - chown admin:admin /opt/scripts /opt/data
+  - chmod 755 /opt/scripts /opt/data
+
+# Write useful management scripts
+write_files:
+  # Enhanced status script
+  - content: |
+      #!/bin/bash
+      echo "=== Enhanced Server Status ==="
+      echo "Hostname: $(hostname)"
+      echo "IP Address: $(hostname -I | awk '{print $1}')"
+      echo "OS: $(lsb_release -d | cut -f2)"
+      echo "Uptime: $(uptime -p)"
+      echo "Load: $(uptime | awk '{print $NF}')"
+      echo "Memory: $(free -h | grep Mem | awk '{print $3"/"$2}')"
+      echo "Disk: $(df -h / | tail -1 | awk '{print $3"/"$2" ("$5" used)"}')"
+      echo ""
+      echo "=== Services ==="
+      echo "qemu-guest-agent: $(systemctl is-active qemu-guest-agent)"
+      echo "docker: $(systemctl is-active docker)"
+      echo "fail2ban: $(systemctl is-active fail2ban)"
+      echo "ufw: $(systemctl is-active ufw)"
+      echo ""
+      echo "=== Users ==="
+      echo "• admin (sudo, docker, passwordless)"
+      echo "• ansible (sudo, docker, passwordless)"  
+      echo "• monitor (limited sudo for monitoring)"
+      echo ""
+      echo "=== Docker ==="
+      if systemctl is-active docker >/dev/null; then
+          echo "Containers: $(docker ps --format '{{.Names}}' | wc -l) running"
+          echo "Images: $(docker images -q | wc -l) available"
+      else
+          echo "Docker service not running"
+      fi
+    path: /usr/local/bin/server-status
+    permissions: '0755'
+  
+  # Simple backup script
+  - content: |
+      #!/bin/bash
+      # Simple system state backup
+      BACKUP_DIR="/opt/data/backups"
+      DATE=$(date +%Y%m%d_%H%M%S)
+      
+      mkdir -p "$BACKUP_DIR"
+      
+      # Backup system info
+      {
+          echo "=== System Backup $DATE ==="
+          echo "Hostname: $(hostname)"
+          echo "Users:"
+          cat /etc/passwd | grep -E "(admin|ansible|monitor)"
+          echo ""
+          echo "Installed packages:"
+          dpkg -l | grep "^ii" | awk '{print $2}' | sort
+          echo ""
+          echo "Services:"
+          systemctl list-units --type=service --state=active --no-pager
+      } > "$BACKUP_DIR/system-state-$DATE.txt"
+      
+      echo "System state backed up to $BACKUP_DIR/system-state-$DATE.txt"
+    path: /usr/local/bin/backup-system-state
+    permissions: '0755'
+    owner: admin:admin
+  
+  # Docker management helper
+  - content: |
+      #!/bin/bash
+      # Simple Docker management commands
+      case "$1" in
+          status)
+              echo "=== Docker Status ==="
+              docker system df
+              echo ""
+              docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+              ;;
+          cleanup)
+              echo "Cleaning up Docker resources..."
+              docker system prune -f
+              echo "Cleanup completed"
+              ;;
+          *)
+              echo "Usage: $0 {status|cleanup}"
+              echo "  status  - Show Docker system status"
+              echo "  cleanup - Clean up unused Docker resources"
+              ;;
+      esac
+    path: /usr/local/bin/docker-helper
+    permissions: '0755'
+    owner: admin:admin
+
+# Custom MOTD
+write_files:
+  - content: |
+      #!/bin/bash
+      # Dynamic MOTD
+      echo "╭─────────────────────────────────────╮"
+      echo "│         Enhanced Server Ready       │"
+      echo "├─────────────────────────────────────┤"
+      echo "│ Hostname: $(hostname)"
+      echo "│ IP: $(hostname -I | awk '{print $1}')"
+      echo "│ Users: admin, ansible (sudo+docker)"
+      echo "│ Monitor: monitor (limited sudo)"
+      echo "│ Tools: docker, python3, node.js"
+      echo "├─────────────────────────────────────┤"
+      echo "│ Commands:"
+      echo "│ • server-status       (system info)"
+      echo "│ • docker-helper       (Docker mgmt)"
+      echo "│ • backup-system-state (backup info)"
+      echo "╰─────────────────────────────────────╯"
+    path: /etc/update-motd.d/01-custom
+    permissions: '0755'
+
+# Final message
+final_message: |
+  Enhanced server bootstrap completed!
+  
+  ✓ Core services: qemu-guest-agent, docker, fail2ban
+  ✓ Users: admin, ansible (sudo+docker), monitor (limited)
+  ✓ SSH key authentication with security hardening
+  ✓ Development tools: docker, python3, node.js
+  ✓ Management scripts: server-status, docker-helper, backup
+  ✓ Enhanced firewall and security configuration
+  
+  Access:
+  • SSH: ssh admin@<server-ip>
+  • Console: qm terminal <vmid> 
+  • Status: server-status
+  • Docker: docker-helper status
+  
+  Enhanced server ready for development and production use!

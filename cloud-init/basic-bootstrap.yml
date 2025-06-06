@@ -1,0 +1,89 @@
+#cloud-config
+# Basic Server Bootstrap - Simple cloud-init for Terraform deployments
+# Focuses on: user setup, SSH keys, passwordless sudo, essential tools
+
+# System updates and essential packages
+package_update: true
+package_upgrade: true
+packages:
+  - qemu-guest-agent
+  - curl
+  - wget
+  - vim
+  - htop
+  - git
+  - unzip
+  - net-tools
+
+# User configuration
+users:
+  # Main admin user
+  - name: admin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... # Replace with your SSH public key
+    lock_passwd: false # Allow setting password via Terraform if needed
+
+  # Service/automation user
+  - name: ansible
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... # Replace with your SSH public key
+    lock_passwd: false
+
+# SSH configuration
+ssh_pwauth: true # Allow password auth (useful for console access)
+disable_root: false
+
+# System configuration
+timezone: America/New_York
+locale: en_US.UTF-8
+
+# Essential services and commands
+runcmd:
+  # Enable and start qemu-guest-agent (crucial for Proxmox)
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+
+  # Set timezone
+  - timedatectl set-timezone America/New_York
+
+  # Basic firewall setup
+  - ufw --force enable
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow ssh
+
+# Write a simple status script
+write_files:
+  - content: |
+      #!/bin/bash
+      echo "=== Server Status ==="
+      echo "Hostname: $(hostname)"
+      echo "IP: $(hostname -I | awk '{print $1}')"
+      echo "Uptime: $(uptime -p)"
+      echo "Users: admin, ansible (sudo group, passwordless)"
+      echo "SSH: Key-based auth enabled"
+      echo "Guest Agent: $(systemctl is-active qemu-guest-agent)"
+    path: /usr/local/bin/server-status
+    permissions: "0755"
+
+# Final message
+final_message: |
+  Basic server bootstrap completed!
+
+  ✓ qemu-guest-agent enabled for Proxmox management
+  ✓ Users configured: admin, ansible (passwordless sudo)
+  ✓ SSH key authentication enabled
+  ✓ Basic firewall configured (SSH only)
+  ✓ Essential tools installed
+
+  SSH Access: ssh admin@<server-ip>
+  Console: qm terminal <vmid>
+  Status: server-status
+
+  Server ready for use!
